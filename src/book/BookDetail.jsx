@@ -169,12 +169,6 @@ const BookDetail = () => {
           </div>
         </div>
       )}
-      {book.approval_note && (
-        <div className="bd-section">
-          <h4 className="bd-section-title">Ghi chú phê duyệt</h4>
-          <p className="bd-desc">{book.approval_note}</p>
-        </div>
-      )}
       {/* Hiển thị thể loại */}
       {book && categories.length > 0 && (
         <div className="bd-meta-category">

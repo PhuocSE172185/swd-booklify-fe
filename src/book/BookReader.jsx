@@ -32,15 +32,43 @@ const BookReader = () => {
   const [currentCfi, setCurrentCfi] = useState('');
   const [notes, setNotes] = useState([]); // Thêm state để lưu notes
   
+  // Popup state for text note
+  const [activeTextNote, setActiveTextNote] = useState(null);
+  
+  // State for CFI range
+  const [currentCfiStart, setCurrentCfiStart] = useState('');
+  const [currentCfiEnd, setCurrentCfiEnd] = useState('');
+  
+  // Mounted state giống book-management
+  const [mounted, setMounted] = useState(false);
+  
+  // Thêm ref để lưu giá trị CFI đồng bộ
+  const cfiStartRef = useRef('');
+  const cfiEndRef = useRef('');
+  
   const viewerRef = useRef(null);
   const renditionRef = useRef(null);
   const epubBookRef = useRef(null);
+  
+  // Thêm ref để ngăn multiple API calls
+  const fetchingNotesRef = useRef(false);
+  const currentChapterIdRef = useRef(null);
+  const fetchingBookRef = useRef(false);
+  const fetchingChaptersRef = useRef(false);
+  const hasLoadedBookRef = useRef(false);
+  const hasLoadedChaptersRef = useRef(false);
 
-  // Fetch notes cho chapter hiện tại - SỬA ENDPOINT
+  // Fetch notes cho chapter hiện tại - SỬA ENDPOINT VÀ THÊM REF
   const fetchChapterNotes = async (chapterId) => {
+    // Ngăn multiple calls (chỉ block khi đang fetching, KHÔNG block nếu chỉ cùng chapterId)
+    if (fetchingNotesRef.current) {
+      console.log('Skipping fetch - already fetching:', chapterId);
+      return;
+    }
+    fetchingNotesRef.current = true;
+    currentChapterIdRef.current = chapterId;
     try {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-      // Sử dụng endpoint /list với filter chapterId
       const response = await fetch(`${API_BASE_URL}/chapter-notes/list?chapterId=${chapterId}&pageSize=100`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -52,14 +80,18 @@ const BookReader = () => {
       if (response.ok && result.data && result.data.data) {
         const notesData = Array.isArray(result.data.data) ? result.data.data : [];
         setNotes(notesData);
-        // Áp dụng highlights lên EPUB reader
-        applyHighlightsToReader(notesData);
+        // Always re-apply highlights after notes are fetched
+        setTimeout(() => applyHighlightsToReader(notesData), 200);
       } else {
         setNotes([]);
+        setTimeout(() => applyHighlightsToReader([]), 200);
       }
     } catch (error) {
       console.error('Error fetching notes:', error);
       setNotes([]);
+      setTimeout(() => applyHighlightsToReader([]), 200);
+    } finally {
+      fetchingNotesRef.current = false;
     }
   };
 
@@ -138,17 +170,23 @@ const BookReader = () => {
     try {
       console.log('Applying highlights to reader:', notesData);
       
-      // Lọc chỉ lấy highlights có CFI
+      // Clear previous annotations to prevent overlap
+      try {
+        renditionRef.current.annotations.clear();
+        console.log('Cleared previous annotations');
+      } catch (clearError) {
+        console.warn('Could not clear previous annotations:', clearError);
+      }
+      
+      // Lọc chỉ lấy highlights có CFI hợp lệ
       const highlights = notesData.filter(note => 
-        note.note_type === 2 && note.cfi && note.highlighted_text
+        note.note_type === 2 && 
+        note.highlighted_text && 
+        (note.cfi_start || note.cfi) &&
+        (note.cfi_start?.startsWith('epubcfi(') || note.cfi?.startsWith('epubcfi('))
       );
 
       console.log('Valid highlights with CFI:', highlights);
-
-      if (highlights.length === 0) {
-        console.log('No valid highlights to apply');
-        return;
-      }
 
       highlights.forEach((highlight, index) => {
         try {
@@ -159,16 +197,42 @@ const BookReader = () => {
             color: highlight.color
           });
 
+          // Chuẩn hóa cfi range nếu có cfi_start và cfi_end
+          let cfiRange = highlight.cfi_start && highlight.cfi_end
+            ? (() => {
+                let start = highlight.cfi_start;
+                let end = highlight.cfi_end;
+                
+                // Validate both start and end CFI
+                if (!start.startsWith('epubcfi(') || !end.startsWith('epubcfi(')) {
+                  console.warn(`Invalid CFI start/end for highlight ${index + 1}:`, { start, end });
+                  return highlight.cfi_start || highlight.cfi; // Fallback to single CFI
+                }
+                
+                console.log(`CFI Range for highlight ${index + 1}:`, { start, end });
+                return `${start},${end}`;
+              })()
+            : (highlight.cfi_start || highlight.cfi);
+
+          // Validate CFI format before using it
+          if (!cfiRange || !cfiRange.startsWith('epubcfi(')) {
+            console.warn(`Invalid CFI format for highlight ${index + 1}:`, cfiRange, highlight);
+            return; // Skip this highlight if CFI is invalid
+          }
+
           const highlightColor = highlight.color || "#ffff00";
           let success = false;
           
+          console.log(`Using CFI for highlight ${index + 1}:`, cfiRange);
+
           // Method 1: Direct iframe DOM manipulation (MỚI - thử trước)
           try {
             const iframe = viewerRef.current?.querySelector('iframe');
             if (iframe && iframe.contentDocument) {
               const doc = iframe.contentDocument;
               
-              // Tìm text trong iframe document
+              // Tìm text trong iframe document - CÁCH TIẾP CẬN MỚI
+              const fullText = highlight.highlighted_text;
               const walker = doc.createTreeWalker(
                 doc.body,
                 NodeFilter.SHOW_TEXT,
@@ -177,16 +241,39 @@ const BookReader = () => {
               );
               
               let textNode;
-              const searchText = highlight.highlighted_text.substring(0, 30); // Lấy đoạn đầu để tìm
+              // Tìm kiếm chính xác full text hoặc từng phần
               
-                //eslint-disable-next-line no-cond-assign
+              //eslint-disable-next-line no-cond-assign
               while ((textNode = walker.nextNode())) {
-                if (textNode.textContent.includes(searchText)) {
+                const nodeText = textNode.textContent;
+                
+                // Tìm vị trí bắt đầu của text trong node
+                let startIndex = nodeText.indexOf(fullText);
+                if (startIndex === -1) {
+                  // Nếu không tìm thấy full text, thử tìm phần đầu
+                  const firstWords = fullText.split(' ').slice(0, 3).join(' ');
+                  startIndex = nodeText.indexOf(firstWords);
+                }
+                
+                if (startIndex !== -1) {
                   try {
+                    // Tính toán độ dài thực tế cần highlight
+                    let endIndex = startIndex + fullText.length;
+                    
+                    // Đảm bảo không vượt quá độ dài của text node
+                    if (endIndex > nodeText.length) {
+                      endIndex = nodeText.length;
+                    }
+                    
+                    // Kiểm tra xem có đủ text để highlight không
+                    const availableText = nodeText.substring(startIndex, endIndex);
+                    if (availableText.length < Math.min(fullText.length * 0.5, 10)) {
+                      continue; // Skip nếu text quá ngắn
+                    }
+                    
                     const range = doc.createRange();
-                    const startIndex = textNode.textContent.indexOf(searchText);
                     range.setStart(textNode, startIndex);
-                    range.setEnd(textNode, startIndex + searchText.length);
+                    range.setEnd(textNode, endIndex);
                     
                     const span = doc.createElement('span');
                     span.style.backgroundColor = highlightColor;
@@ -195,9 +282,10 @@ const BookReader = () => {
                     span.style.padding = '1px 2px';
                     span.className = 'manual-highlight';
                     span.setAttribute('data-highlight-id', highlight.id);
+                    span.title = fullText; // Tooltip để hiển thị full text
                     
                     range.surroundContents(span);
-                    console.log(`✅ Direct iframe DOM success for: ${highlight.cfi}`);
+                    console.log(`✅ Direct iframe DOM success for: ${highlight.cfi}, highlighted: "${availableText}"`);
                     success = true;
                     break;
                   } catch (domError) {
@@ -215,7 +303,7 @@ const BookReader = () => {
 
           // Method 2: Mark API
           try {
-            renditionRef.current.mark(highlight.cfi, {
+            renditionRef.current.mark(cfiRange, {
               type: "highlight",
               data: {
                 id: highlight.id,
@@ -230,7 +318,7 @@ const BookReader = () => {
                 span.style.padding = "1px 2px";
                 span.className = "epub-highlight";
                 range.surroundContents(span);
-                console.log(`✅ Mark method success for CFI: ${highlight.cfi}`);
+                console.log(`✅ Mark method success for CFI: ${cfiRange}`);
                 success = true;
                 return span;
               }
@@ -246,7 +334,7 @@ const BookReader = () => {
           try {
             renditionRef.current.annotations.add(
               "highlight",
-              highlight.cfi,
+              cfiRange,
               {},
               null,
               "highlight",
@@ -256,7 +344,7 @@ const BookReader = () => {
                 "mix-blend-mode": "multiply"
               }
             );
-            console.log(`✅ Annotations method success for CFI: ${highlight.cfi}`);
+            console.log(`✅ Annotations method success for CFI: ${cfiRange}`);
             success = true;
           } catch (annotError) {
             // eslint-disable-next-line no-unused-vars
@@ -266,7 +354,7 @@ const BookReader = () => {
             try {
               renditionRef.current.annotations.add(
                 "underline",
-                highlight.cfi,
+                cfiRange,
                 {},
                 null,
                 "underline",
@@ -276,7 +364,7 @@ const BookReader = () => {
                   "stroke-opacity": "0.8"
                 }
               );
-              console.log(`✅ Underline method success for CFI: ${highlight.cfi}`);
+              console.log(`✅ Underline method success for CFI: ${cfiRange}`);
               success = true;
             } catch (underlineError) {
               // eslint-disable-next-line no-unused-vars
@@ -286,6 +374,80 @@ const BookReader = () => {
 
         } catch (error) {
           console.error(`❌ Outer error for highlight ${index + 1}:`, error, highlight);
+        }
+      });
+
+      // Always process text notes, even if there are no highlights
+      const textNotes = notesData.filter(note => note.note_type === 1 && (note.cfi_start || note.cfi));
+      textNotes.forEach((note) => {
+        try {
+          // Validate cfi_start and cfi for well-formed CFI (must start with 'epubcfi(' and end with ')')
+          let cfiPosition = null;
+          if (
+            note.cfi_start &&
+            typeof note.cfi_start === 'string' &&
+            note.cfi_start.startsWith('epubcfi(') &&
+            note.cfi_start.endsWith(')') &&
+            note.cfi_start.length > 15
+          ) {
+            cfiPosition = note.cfi_start;
+          } else if (
+            note.cfi &&
+            typeof note.cfi === 'string' &&
+            note.cfi.startsWith('epubcfi(') &&
+            note.cfi.endsWith(')') &&
+            note.cfi.length > 15
+          ) {
+            cfiPosition = note.cfi;
+          } else {
+            console.warn(`Invalid CFI for text note ${note.id}:`, note.cfi_start, note.cfi);
+            return;
+          }
+          // If CFI is a range, only use the first part
+          if (cfiPosition.includes(',')) {
+            cfiPosition = cfiPosition.split(',')[0];
+          }
+          // Render icon annotation (type: annotation, subtype: note)
+          renditionRef.current.annotations.add(
+            "annotation",
+            cfiPosition,
+            { noteId: note.id },
+            () => setActiveTextNote(note),
+            "note",
+            {
+              "background": "#6c63ff",
+              "color": "#fff",
+              "border": "2px solid #fff",
+              "border-radius": "50%",
+              "width": "28px",
+              "height": "28px",
+              "display": "inline-flex",
+              "align-items": "center",
+              "justify-content": "center",
+              "font-weight": "bold",
+              "font-size": "18px",
+              "box-shadow": "0 2px 8px rgba(108,99,255,0.25)",
+              "cursor": "pointer",
+              "z-index": "9999",
+              "position": "relative"
+            },
+            undefined,
+            undefined,
+            undefined,
+            (el) => {
+              if (!el) {
+                console.warn('❌ Không tìm thấy DOM node annotation cho note', note.id, cfiPosition);
+                return;
+              }
+              el.innerHTML = '📝';
+              el.style.border = '2px solid red'; // debug: border đỏ để dễ nhận biết
+              el.title = note.content || 'Text Note';
+              console.log('✅ Rendered note icon DOM:', el, note);
+            }
+          );
+          console.log(`✅ Successfully added text note icon for ${note.id}`);
+        } catch (err) {
+          console.error('Error rendering text note icon:', err, note);
         }
       });
 
@@ -314,17 +476,39 @@ const BookReader = () => {
     }
   };
 
-  // Fetch notes khi chuyển chapter
+  // Fetch notes khi chuyển chapter - THÊM CLEANUP
   useEffect(() => {
-    if (currentChapter?.id) {
+    if (currentChapter?.id && mounted) {
       console.log('Fetching notes for current chapter:', currentChapter.id);
       fetchChapterNotes(currentChapter.id);
     }
-  }, [currentChapter]);
+    
+    // Cleanup function để reset refs khi component unmount hoặc chapter change
+    return () => {
+      fetchingNotesRef.current = false;
+      currentChapterIdRef.current = null;
+    };
+  }, [currentChapter, mounted]);
 
-  // Lấy file_url và title
+  // Initial mount setup - GIỐNG BOOK-MANAGEMENT
+  useEffect(() => {
+    if (!mounted) {
+      setMounted(true);
+      console.log('📱 Component mounted, ready for API calls');
+    }
+  }, [mounted]);
+
+  // Lấy file_url và title - NGĂN MULTIPLE CALLS
   useEffect(() => {
     const fetchBook = async () => {
+      // Ngăn multiple calls giống book-management
+      if (fetchingBookRef.current || hasLoadedBookRef.current || !mounted) {
+        console.log('Skipping book fetch - already fetching, loaded, or not mounted');
+        return;
+      }
+      
+      fetchingBookRef.current = true;
+      
       try {
         console.log('Fetching book data for ID:', id);
         const response = await fetch(`${API_BASE_URL}/books/${id}`, { method: 'GET' });
@@ -333,19 +517,32 @@ const BookReader = () => {
         if (response.ok && res.data && res.data.file_url) {
           setFileUrl(res.data.file_url);
           setBookTitle(res.data.title || '');
-          console.log('Book loaded:', { fileUrl: res.data.file_url, title: res.data.title });
+          hasLoadedBookRef.current = true;
+          console.log('✅ Book loaded:', { fileUrl: res.data.file_url, title: res.data.title });
         }
       } catch (error) { 
         console.error('Error fetching book:', error);
-        return; 
+      } finally {
+        fetchingBookRef.current = false;
       }
     };
-    fetchBook();
-  }, [id]);
+    
+    if (id && mounted) {
+      fetchBook();
+    }
+  }, [id, mounted]);
 
-  // Lấy chapters từ API để mapping
+  // Lấy chapters từ API để mapping - NGĂN MULTIPLE CALLS
   useEffect(() => {
     const fetchChapters = async () => {
+      // Ngăn multiple calls giống book-management
+      if (fetchingChaptersRef.current || hasLoadedChaptersRef.current || !mounted) {
+        console.log('Skipping chapters fetch - already fetching, loaded, or not mounted');
+        return;
+      }
+      
+      fetchingChaptersRef.current = true;
+      
       try {
         console.log('Fetching chapters for book ID:', id);
         const response = await fetch(`${API_BASE_URL}/books/${id}/chapters`, { method: 'GET' });
@@ -353,18 +550,24 @@ const BookReader = () => {
         console.log('Chapters response:', res);
         if (response.ok && Array.isArray(res.data)) {
           setChapters(res.data);
-          console.log('Chapters loaded:', res.data.length);
+          hasLoadedChaptersRef.current = true;
+          console.log('✅ Chapters loaded:', res.data.length);
         } else if (response.ok && res.data && Array.isArray(res.data.data)) {
           setChapters(res.data.data);
-          console.log('Chapters loaded from nested data:', res.data.data.length);
+          hasLoadedChaptersRef.current = true;
+          console.log('✅ Chapters loaded from nested data:', res.data.data.length);
         }
       } catch (error) { 
         console.error('Error fetching chapters:', error);
-        return; 
+      } finally {
+        fetchingChaptersRef.current = false;
       }
     };
-    fetchChapters();
-  }, [id]);
+    
+    if (id && mounted) {
+      fetchChapters();
+    }
+  }, [id, mounted]);
 
   // Hàm tìm chapter trong cây chapters (để xử lý nested chapters)
   const findChapterById = (chapters, targetId) => {
@@ -624,8 +827,7 @@ const BookReader = () => {
   // Hàm xử lý context menu (chuột phải)
   const handleContextMenu = (event) => {
     event.preventDefault();
-    console.log('Context menu triggered at:', { x: event.clientX, y: event.clientY });
-    
+    handleTextSelection(); // Đảm bảo cập nhật CFI trước khi mở menu
     // Lấy text được chọn
     let selectedTextContent = '';
     const iframe = viewerRef.current?.querySelector('iframe');
@@ -634,17 +836,13 @@ const BookReader = () => {
     } else {
       selectedTextContent = window.getSelection().toString().trim();
     }
-    
-    console.log('Selected text for context menu:', selectedTextContent);
-    
+    // Log kiểm tra giá trị CFI start/end
+    console.log('ContextMenu - cfi_start:', currentCfiStart, 'cfi_end:', currentCfiEnd);
     // Lấy thông tin trang và CFI hiện tại
     const cfi = getCurrentCfi();
     const pageNum = getCurrentPageNumber();
     setCurrentCfi(cfi);
     setCurrentPageNumber(pageNum);
-    
-    console.log('Current page info:', { cfi, pageNum });
-    
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
@@ -701,14 +899,51 @@ const BookReader = () => {
     });
 
     const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-    
+
+    let cfiStart = cfiStartRef.current || '';
+    let cfiEnd = cfiEndRef.current || '';
+
+    console.log('CFI before normalization:', { cfiStart, cfiEnd });
+
+    // Chuẩn hóa cfiEnd nếu thiếu prefix
+    if (cfiEnd && !cfiEnd.startsWith('epubcfi(') && cfiStart.startsWith('epubcfi(')) {
+      const match = cfiStart.match(/^(epubcfi\([^)]+\))/);
+      if (match) {
+        cfiEnd = `${match[1]}${cfiEnd}`;
+        console.log('CFI End normalized:', cfiEnd);
+      }
+    }
+
+    // Validation: Đảm bảo cfiStart và cfiEnd đều có định dạng đúng
+    if (cfiStart && !cfiStart.startsWith('epubcfi(')) {
+      console.warn('Invalid CFI Start format:', cfiStart);
+    }
+    if (cfiEnd && !cfiEnd.startsWith('epubcfi(')) {
+      console.warn('Invalid CFI End format:', cfiEnd);
+    }
+
+    // For text notes, if cfiStart/cfiEnd are available, use them as primary CFI
     let noteData = {
       note_type: type === 'text' ? 1 : 2, // TextNote = 1, Highlight = 2
       page_number: currentPageNumber,
       chapter_id: currentChapter.id,
-      ...(currentCfi && { cfi: currentCfi }),
-      ...(noteColor && { color: noteColor })
+      cfi: currentCfi || null,
+      cfi_start: cfiStart || null,
+      cfi_end: cfiEnd || null,
+      color: noteColor || null
     };
+
+    // For text notes, if cfiStart is available, set cfi = cfiStart for best compatibility
+    if (type === 'text' && cfiStart) {
+      noteData.cfi = cfiStart;
+    }
+
+    console.log('CFI after normalization:', {
+      cfiStart: noteData.cfi_start,
+      cfiEnd: noteData.cfi_end,
+      cfi: noteData.cfi
+    });
+    console.log('Note data to send:', noteData);
 
     // Add required fields based on note type
     if (type === 'text') {
@@ -749,8 +984,13 @@ const BookReader = () => {
       if (response.ok) {
         // alert(`${type === 'text' ? 'Text note' : 'Highlight'} created successfully!`);
         console.log('Note created successfully:', result);
-        // Fetch lại notes sau khi tạo thành công
-        fetchChapterNotes(currentChapter.id);
+        // Fetch lại notes sau khi tạo thành công - ĐẢM BẢO REFRESH
+        if (currentChapter?.id) {
+          console.log('Refreshing notes after successful creation...');
+          setTimeout(() => {
+            fetchChapterNotes(currentChapter.id);
+          }, 200); // Delay nhỏ để đảm bảo database đã được cập nhật
+        }
       } else {
         console.error('Failed to create note:', result);
         alert(result.message || 'Failed to create note');
@@ -856,24 +1096,161 @@ const BookReader = () => {
     // Add event listeners after render
     rendition.on('rendered', () => {
       console.log('EPUB rendered, adding event listeners');
-      
       // Add context menu listener to iframe
       const iframe = viewerRef.current?.querySelector('iframe');
       if (iframe && iframe.contentDocument) {
         console.log('Adding context menu listener to iframe');
         iframe.contentDocument.addEventListener('contextmenu', handleContextMenu);
       }
-
       // Inject CSS vào iframe để force highlights hiển thị
       injectHighlightCSS();
+      // Always re-apply highlights after EPUB render (even if notes is empty)
+      setTimeout(() => {
+        console.log('Re-applying highlights after EPUB render');
+        applyHighlightsToReader(notes);
+      }, 500);
+    });
 
-      // Áp dụng highlights khi EPUB đã render xong
-      if (notes.length > 0) {
-        setTimeout(() => {
-          console.log('Re-applying highlights after EPUB render');
-          applyHighlightsToReader(notes);
-        }, 1000); // Tăng delay lên 1s
+    // Lắng nghe sự kiện chọn text trong epub.js để lấy đúng CFI range
+    rendition.on('selected', (cfiRange, contents) => {
+      let cfiStart = '', cfiEnd = '';
+      
+      console.log('Raw CFI Range from epub.js:', cfiRange);
+      
+      // Check if cfiRange is an object with cfiStart and cfiEnd properties
+      if (cfiRange && typeof cfiRange === 'object' && cfiRange.cfiStart) {
+        cfiStart = cfiRange.cfiStart;
+        cfiEnd = cfiRange.cfiEnd || '';
+        
+        // Chuẩn hóa cfiEnd nếu nó không có định dạng đầy đủ
+        if (cfiEnd && !cfiEnd.startsWith('epubcfi(') && cfiStart && cfiStart.startsWith('epubcfi(')) {
+          const match = cfiStart.match(/^(epubcfi\([^)]+\))/);
+          if (match) {
+            cfiEnd = `${match[1]}${cfiEnd}`;
+          }
+        }
+      } 
+      // Check if cfiRange is a string with comma-separated CFIs
+      else if (typeof cfiRange === 'string' && cfiRange.includes(',')) {
+        // Parse CFI range format: 'epubcfi(...),/start:offset,/end:offset'
+        let parts = [];
+        
+        // First, we need to handle the closing parenthesis properly
+        if (cfiRange.endsWith(')')) {
+          // Remove the closing parenthesis from the end and add it back to the first part
+          const cleanCfiRange = cfiRange.slice(0, -1); // Remove last )
+          parts = cleanCfiRange.split(',');
+          parts[0] = parts[0] + ')'; // Add ) back to the first part
+        } else {
+          // Fallback to simple split if no closing parenthesis at end
+          parts = cfiRange.split(',');
+        }
+        
+        console.log('CFI Parts:', parts);
+        
+        if (parts.length >= 3) {
+          // Format: epubcfi(...),/start:offset,/end:offset
+          const originalCfiStart = parts[0]; // epubcfi(/6/8!/4/4[id70337692394360]/12)
+          const startOffset = parts[1]; // /1:1
+          const endOffset = parts[2]; // /1:31
+          
+          console.log('CFI Parts (after cleanup):', { originalCfiStart, startOffset, endOffset });
+          
+          // Extract base CFI by removing the last path segment
+          // From 'epubcfi(/6/8!/4/4[id70337692394360]/12)' we need 'epubcfi(/6/8!/4/4[id70337692394360])'
+          const cfiMatch = originalCfiStart.match(/^epubcfi\(([^)]+)\)/);
+          if (cfiMatch) {
+            const innerPath = cfiMatch[1]; // /6/8!/4/4[id70337692394360]/12
+            console.log('Inner CFI path:', innerPath);
+            
+            // Split by '/' and remove the last segment
+            const pathParts = innerPath.split('/');
+            console.log('Path parts:', pathParts);
+            
+            // Remove last segment (which is '12' in this case)
+            pathParts.pop();
+            const basePath = pathParts.join('/'); // /6/8!/4/4[id70337692394360]
+            const baseCfi = `epubcfi(${basePath})`;
+            
+            console.log('Base CFI constructed:', baseCfi);
+            
+            // Build full CFI paths
+            cfiStart = `${originalCfiStart.slice(0, -1)}${startOffset}`; // epubcfi(/6/8!/4/4[id70337692394360]/12/1:1
+            cfiEnd = `${baseCfi}${endOffset}`; // epubcfi(/6/8!/4/4[id70337692394360])/1:31
+            
+            console.log('Built CFI range:', { 
+              originalCfiStart,
+              finalCfiStart: cfiStart, 
+              finalCfiEnd: cfiEnd, 
+              baseCfi, 
+              startOffset, 
+              endOffset 
+            });
+          } else {
+            console.error('Failed to parse CFI format from:', originalCfiStart);
+          }
+        } else if (parts.length === 2) {
+          // Format: epubcfi(...),/offset (single offset)
+          const originalCfi = parts[0];
+          const offset = parts[1];
+          
+          console.log('2-part CFI format:', { originalCfi, offset });
+          
+          cfiStart = originalCfi;
+          
+          // Extract base CFI for end point
+          const cfiMatch = originalCfi.match(/^epubcfi\(([^)]+)\)/);
+          if (cfiMatch) {
+            const innerPath = cfiMatch[1];
+            const pathParts = innerPath.split('/');
+            pathParts.pop(); // Remove last segment
+            const basePath = pathParts.join('/');
+            cfiEnd = `epubcfi(${basePath})${offset}`;
+            
+            console.log('2-part CFI result:', { cfiStart, cfiEnd });
+          } else {
+            console.error('Failed to parse 2-part CFI:', originalCfi);
+          }
+        } else {
+          // Fallback to simple assignment
+          cfiStart = parts[0] || '';
+          cfiEnd = parts[1] || '';
+          
+          // Chuẩn hóa cfiEnd thành CFI đầy đủ nếu thiếu
+          if (cfiEnd && !cfiEnd.startsWith('epubcfi(') && cfiStart.startsWith('epubcfi(')) {
+            const match = cfiStart.match(/^(epubcfi\([^)]+\))/);
+            if (match) {
+              cfiEnd = match[1] + cfiEnd;
+            }
+          }
+        }
+      } 
+      // Single CFI string
+      else if (typeof cfiRange === 'string') {
+        cfiStart = cfiRange;
       }
+      
+      console.log('Parsed CFI:', { cfiStart, cfiEnd });
+      
+      // Ensure cfiStart and cfiEnd are well-formed (start with epubcfi( and end with ))
+      if (cfiStart && cfiStart.startsWith('epubcfi(') && !cfiStart.endsWith(')')) {
+        cfiStart = cfiStart + ')';
+      }
+      if (cfiEnd && cfiEnd.startsWith('epubcfi(') && !cfiEnd.endsWith(')')) {
+        cfiEnd = cfiEnd + ')';
+      }
+      setCurrentCfiStart(cfiStart);
+      setCurrentCfiEnd(cfiEnd || '');
+      cfiStartRef.current = cfiStart;
+      cfiEndRef.current = cfiEnd || '';
+      const text = contents.window.getSelection().toString();
+      setSelectedText(text);
+      console.log('epub.js selected event:', { 
+        originalCfiRange: cfiRange,
+        normalizedCfiStart: cfiStart, 
+        normalizedCfiEnd: cfiEnd, 
+        text 
+      });
     });
 
     // Thêm event listener cho location changed để re-apply highlights
@@ -951,24 +1328,55 @@ const BookReader = () => {
 
   // Hàm lấy đoạn văn khi bôi đen
   const handleTextSelection = () => {
-    let text = '';
-    // Tìm iframe trong viewer
-    const viewer = viewerRef.current;
-    if (viewer) {
-      const iframe = viewer.querySelector('iframe');
-      if (iframe && iframe.contentWindow && iframe.contentWindow.getSelection) {
-        text = iframe.contentWindow.getSelection().toString();
-      } else if (window.getSelection) {
-        text = window.getSelection().toString();
+  let text = '';
+  const viewer = viewerRef.current;
+  if (viewer) {
+    const iframe = viewer.querySelector('iframe');
+    if (iframe && iframe.contentWindow && iframe.contentWindow.getSelection) {
+      text = iframe.contentWindow.getSelection().toString();
+    } else if (window.getSelection) {
+      text = window.getSelection().toString();
+    }
+  }
+  text = Array.from(text).filter(ch => ch.charCodeAt(0) >= 32).join('');
+  setSelectedText(text);
+
+  // Only try to get CFI range if we don't already have valid CFI values from epub.js selected event
+  if (!cfiStartRef.current && !cfiEndRef.current && renditionRef.current) {
+    let cfiStart = '', cfiEnd = '';
+    
+    // Try getRange (nhiều bản epub.js mới hỗ trợ)
+    if (typeof renditionRef.current.getRange === 'function') {
+      const range = renditionRef.current.getRange();
+      if (range && range.start && range.end) {
+        cfiStart = range.start.cfi;
+        cfiEnd = range.end.cfi;
       }
     }
-    // Loại bỏ ký tự điều khiển
-    text = Array.from(text).filter(ch => ch.charCodeAt(0) >= 32).join('');
-    setSelectedText(text);
-    if (text) {
-      console.log('Text selected:', text);
+    // Fallback getSelection
+    if ((!cfiStart || !cfiEnd) && typeof renditionRef.current.getSelection === 'function') {
+      const selection = renditionRef.current.getSelection();
+      if (selection && selection.cfiRange) {
+        const [start, end] = selection.cfiRange.split(',');
+        cfiStart = start;
+        cfiEnd = end || '';
+      }
     }
-  };
+    
+    // Only update if we found CFI values
+    if (cfiStart) {
+      setCurrentCfiStart(cfiStart);
+      setCurrentCfiEnd(cfiEnd);
+      cfiStartRef.current = cfiStart;
+      cfiEndRef.current = cfiEnd || '';
+    }
+  }
+
+  // Log kiểm tra - always show current CFI state
+  if (text) {
+    console.log('Text selected:', text, 'CFI start:', cfiStartRef.current, 'CFI end:', cfiEndRef.current);
+  }
+};
 
   // Thêm event listener cho viewer
   useEffect(() => {
@@ -1013,6 +1421,20 @@ const BookReader = () => {
       }
     };
   }, [fileUrl, chapters]);
+
+  // Cleanup refs khi component unmount - GIỐNG BOOK-MANAGEMENT
+  useEffect(() => {
+    return () => {
+      // Reset tất cả refs để tránh memory leaks và multiple calls
+      fetchingNotesRef.current = false;
+      currentChapterIdRef.current = null;
+      fetchingBookRef.current = false;
+      fetchingChaptersRef.current = false;
+      hasLoadedBookRef.current = false;
+      hasLoadedChaptersRef.current = false;
+      console.log('🧹 Cleaned up all refs on component unmount');
+    };
+  }, []);
 
   return (
     <div className="book-reader-page">
@@ -1369,6 +1791,48 @@ const BookReader = () => {
               )}
             </div>
           ) : null}
+        </div>
+      )}
+
+      {/* Popup for text note */}
+      {activeTextNote && (
+        <div style={{
+          position: 'fixed',
+          top: 120,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#fff',
+          border: '1px solid #ccc',
+          borderRadius: 8,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+          padding: 20,
+          zIndex: 2000,
+          minWidth: 280,
+          maxWidth: 400
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#6c63ff' }}>Ghi chú</div>
+          <div style={{ marginBottom: 8 }}>{activeTextNote.content}</div>
+          {activeTextNote.highlighted_text && (
+            <div style={{ fontStyle: 'italic', color: '#888', fontSize: 13, marginBottom: 8 }}>
+              "{activeTextNote.highlighted_text}"
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: '#666' }}>
+            Trang: {activeTextNote.page_number} | {activeTextNote.created_at ? new Date(activeTextNote.created_at).toLocaleString() : ''}
+          </div>
+          <button
+            style={{
+              marginTop: 12,
+              padding: '6px 16px',
+              background: '#6c63ff',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              float: 'right'
+            }}
+            onClick={() => setActiveTextNote(null)}
+          >Đóng</button>
         </div>
       )}
     </div>

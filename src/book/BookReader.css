@@ -237,3 +237,48 @@ iframe * .highlight {
   opacity: 1 !important;
   z-index: 999 !important;
 }
+
+/* Text Note Icons - ENHANCED Z-INDEX */
+.epub-container [data-type="textnote"],
+.epub-container [data-type="note"],
+[data-annotation-type="textnote"],
+[data-annotation-type="note"] {
+  background: #6c63ff !important;
+  color: #fff !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: bold !important;
+  font-size: 18px !important;
+  box-shadow: 0 2px 8px rgba(108,99,255,0.25) !important;
+  cursor: pointer !important;
+  z-index: 10000 !important;
+  position: relative !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Text Note Icons Hover */
+.epub-container [data-type="textnote"]:hover,
+.epub-container [data-type="note"]:hover,
+[data-annotation-type="textnote"]:hover,
+[data-annotation-type="note"]:hover {
+  background: #5c53e8 !important;
+  transform: scale(1.1) !important;
+  box-shadow: 0 4px 12px rgba(108,99,255,0.4) !important;
+}
+
+/* Force text note visibility in iframe */
+iframe [data-type="textnote"],
+iframe [data-type="note"],
+iframe [data-annotation-type="textnote"],
+iframe [data-annotation-type="note"] {
+  z-index: 10000 !important;
+  position: absolute !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
+}

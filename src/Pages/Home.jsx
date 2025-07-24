@@ -3,7 +3,7 @@ import Header from '../Components/Header/Header';
 import Brand from '../Components/Brand/Brands';
 import FeaturesBooks from '../Components/FeaturesBooks/FeaturesBooks';
 import BestBook from '../Components/BestSellingBook/BestBook';
-import PopularBook from '../Components/PopularBooks/PopularBook';
+// import PopularBook from '../Components/PopularBooks/PopularBook';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -35,7 +35,7 @@ export default function Home() {
       <Brand />
       <FeaturesBooks books={books} />
       <BestBook book={bestBook} />
-      <PopularBook />
+      {/* <PopularBook /> */}
     </>
   );
 }
