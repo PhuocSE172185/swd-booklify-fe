@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Nav.css';
 import { Link, NavLink } from 'react-router-dom';
-import logo from '../../Assets/logo.png';
+import logo from '../../assets/logo.png';
 import { navLinks, navRight } from '../../Data/Data';
 import { VscMenu } from 'react-icons/vsc';
 import { GrClose } from 'react-icons/gr';
