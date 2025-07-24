@@ -5,6 +5,8 @@ import FeaturesBooks from '../Components/FeaturesBooks/FeaturesBooks';
 import BestBook from '../Components/BestSellingBook/BestBook';
 import PopularBook from '../Components/PopularBooks/PopularBook';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function Home() {
   const [books, setBooks] = useState([]);
 
@@ -12,7 +14,7 @@ export default function Home() {
     const fetchBooks = async () => {
       try {
         const res = await fetch(
-          "https://booklify-h3e6cvgrdjd4gjaw.malaysiawest-01.azurewebsites.net/api/books/list?sortBy=totalviews&isAscending=false&pageNumber=1&pageSize=10"
+          `${API_BASE_URL}/books/list?sortBy=%20totalviews&isAscending=false&pageNumber=1&pageSize=10`, 
         );
         const json = await res.json();
         const booksData = json?.data?.data || [];
