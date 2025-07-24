@@ -1,0 +1,240 @@
+.book-list-page {
+  padding: 32px 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.book-list-page h2 {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.book-list {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 32px;
+  justify-items: center;
+  width: 100%;
+  padding: 24px 24px 0 24px;
+}
+
+.book-card {
+  background: #f9f8f3;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  padding: 18px 12px 24px 12px;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: box-shadow 0.2s;
+  border: 1px solid #ecebe6;
+  height: 100%;
+}
+
+.book-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+}
+
+.book-card img {
+  width: 110px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+
+.book-card h3 {
+  font-size: 17px;
+  margin: 8px 0 4px 0;
+  text-align: center;
+  color: #222;
+  font-family: var(--font-family-prata);
+}
+
+.book-card .author {
+  color: #888;
+  font-size: 15px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.book-card .rating, .book-card .views {
+  font-size: 14px;
+  color: #b3a98f;
+  margin-bottom: 2px;
+  text-align: center;
+}
+
+.book-card button {
+  margin-top: auto;
+  padding: 7px 20px;
+  background: #e4572e;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 15px;
+  transition: background 0.2s;
+  align-self: stretch;
+}
+
+.book-card button:hover {
+  background: #b9451b;
+}
+
+.book-card .btn {
+  margin-top: auto;
+  align-self: center;
+  display: block;
+}
+
+/* Sidebar Filter Styles */
+.sidebar-filter {
+  width: 270px;
+  background: #f7f5ee;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px #0001;
+  padding: 24px 18px 24px 18px;
+  margin-right: 32px;
+  font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+  position: sticky;
+  top: 24px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.sidebar-filter h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 18px;
+  color: #222;
+}
+
+.filter-section {
+  margin-bottom: 18px;
+}
+
+.filter-label {
+  font-size: 1.08rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #222;
+}
+
+.filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-checkbox, .filter-radio {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  color: #444;
+  cursor: pointer;
+}
+
+.filter-checkbox input[type="checkbox"], .filter-radio input[type="radio"] {
+  accent-color: #b23b1a;
+  width: 16px;
+  height: 16px;
+}
+
+.book-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Thay đổi từ gap thành space-between */
+  width: 100%;
+  max-width: 1400px;
+  padding: 0 24px;
+  margin-bottom: 24px;
+}
+
+.book-list-header h2 {
+  margin: 0; /* Reset margin của h2 trong header */
+  flex-grow: 1;
+  text-align: left; /* Căn trái cho title */
+}
+
+/* Style cho subscription status khi ở vị trí mới */
+.subscription-status-header {
+  margin-left: auto; /* Đẩy về phía bên phải */
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-weight: 500;
+  font-size: 14px;
+  border: 1px solid #c8e6c9;
+  white-space: nowrap;
+}
+
+/* Variant cho các trạng thái khác nhau */
+.subscription-status-header.inactive {
+  background: #fffde7;
+  color: #f57c00;
+  border-color: #ffecb3;
+}
+
+.subscription-status-header.expired {
+  background: #ffebee;
+  color: #d32f2f;
+  border-color: #ffcdd2;
+}
+
+@media (max-width: 1200px) {
+  .book-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .book-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .book-list-header h2 {
+    text-align: center;
+    width: 100%;
+  }
+  
+  .subscription-status-header {
+    margin-left: 0;
+    align-self: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .book-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .book-card {
+    width: 90vw;
+    max-width: 320px;
+  }
+  .sidebar-filter {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 24px;
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .book-list {
+    grid-template-columns: 1fr;
+  }
+  .book-card {
+    width: 95vw;
+    max-width: 350px;
+  }
+}

@@ -1,0 +1,47 @@
+.subscription-status-header {
+  margin-left: auto;
+  margin-right: 48px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-weight: 500;
+  font-size: 14px;
+  border: 1px solid #c8e6c9;
+  white-space: nowrap;
+}
+
+.subscription-status-header.inactive {
+  background: #fffde7;
+  color: #f57c00;
+  border-color: #ffecb3;
+}
+
+.subscription-status-header.expired {
+  background: #ffebee;
+  color: #d32f2f;
+  border-color: #ffcdd2;
+}
+
+.subscription-register-btn {
+  background: #ff9800;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 4px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.subscription-register-btn:hover {
+  background: #f57c00;
+}
+
+@media (max-width: 1200px) {
+  .subscription-status-header {
+    margin-left: 0;
+    align-self: center;
+  }
+} 

@@ -1,0 +1,91 @@
+.BestBook{
+    position: relative;
+    overflow: hidden;
+    background: var(--color-bg-2);
+}
+
+.treeShape{
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 300px;
+}
+
+.bestbook-container{
+   width: 74% !important;
+   display: grid;
+   grid-template-columns: 38% auto;
+   gap: 100px;
+   align-items: center;
+   position: relative;
+}
+
+
+.best-book-right{
+    position: relative;
+    z-index: 1;
+}
+
+.bestBookTitle{
+    margin-bottom: 50px;
+}
+
+.best-book-right>div small{
+    text-transform: uppercase;
+}
+.best-book-right h5{
+    margin-top: 35px;
+    margin-bottom: 40px;
+}
+.best-book-right h3{
+margin-top: 30px;
+margin-bottom: 12px;
+}
+
+.best-book-right .btn {
+    padding-left: 0;
+    transition: all 0.3s ease;
+}
+
+.best-book-right .btn:hover {
+    padding-left: 35px;
+    color: var(--color-bg-1) !important;
+}
+
+.best-book-right .btn:hover small {
+    color: var(--color-bg-1) !important;
+}
+
+@media (max-width:1200px) {
+    .bestbook-container{
+        gap: 80px;
+        width: 86% !important;
+    }
+}
+
+@media (max-width:600px) {
+    .bestbook-container {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .best-book-left {
+        width: 60%;
+        margin: 0 auto;
+    }
+
+    .best-book-right {
+        text-align: center;
+    }
+
+    .best-book-right .btn {
+        margin: auto;
+    }
+
+    .best-book-right .btn:hover {
+        padding-left: 35px;
+        color: var(--color-bg-1) !important;
+    }
+}
+
+

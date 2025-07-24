@@ -1,0 +1,104 @@
+.featured-book-container {
+  position: relative;
+}
+
+.featurebook-box {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: center;
+  max-width: 180px; /* Giới hạn chiều rộng */
+  margin-inline: auto;
+}
+
+.featuredbook {
+  background: var(--color-light);
+}
+
+.featuredbook img {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.featurebook-info {
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.featurebook-info h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.featurebook-info small {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.featured-book-container .swiper-pagination {
+  margin: auto;
+  margin-top: 60px;
+}
+
+.feature-border {
+  margin-top: 40px;
+  height: 1px;
+  background: var(--color-dark-EX);
+  width: 100%;
+}
+
+.feature-btn {
+  margin: auto;
+  margin-top: -20px;
+  margin-right: 0;
+  font-size: 0.875rem;
+  padding: 6px 12px;
+}
+
+@media (max-width: 1024px) {
+  .feature-btn {
+    margin: auto;
+    margin-top: 20px;
+  }
+
+  .featurebook-box {
+  margin-top: 32px;
+  display: flex;
+  flex-wrap: wrap; /* Cho phép tự động xuống hàng */
+  justify-content: center;
+  gap: 16px 24px; /* Giảm khoảng cách giữa các card */
+  text-align: center;
+}
+
+.featuredbook {
+  width: 160px; /* Giảm chiều rộng card */
+  background: var(--color-light);
+  padding: 8px;
+}
+
+.featuredbook img {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.featurebook-info {
+  margin-top: 6px;
+  margin-bottom: 8px;
+}
+
+.featurebook-info h4 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.featurebook-info small {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+}

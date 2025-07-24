@@ -1,0 +1,213 @@
+/* Modern Book Detail Layout */
+.book-detail-modern {
+  max-width: 900px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px #0001;
+  padding: 32px 32px 40px 32px;
+  font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+}
+.bd-header {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.bd-info-col {
+  flex: 1;
+}
+.bd-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #222;
+}
+.bd-badges {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.bd-meta {
+  font-size: 15px;
+  color: #555;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bd-meta-category {
+  margin-top: 18px;
+  margin-bottom: 0;
+  font-size: 15px;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bd-cover-col {
+  min-width: 140px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.bd-cover {
+  max-width: 120px;
+  max-height: 180px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #0002;
+}
+.bd-section {
+  margin: 24px 0 0 0;
+}
+.bd-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #222;
+}
+.bd-desc {
+  font-size: 15px;
+  color: #666;
+  margin-bottom: 0;
+}
+.bd-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bd-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 24px 0 0 0;
+}
+.bd-stat {
+  background: #f9f8f3;
+  border-radius: 8px;
+  padding: 16px 0 10px 0;
+  text-align: center;
+}
+.bd-stat-value {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+.bd-stat-label {
+  font-size: 13px;
+  color: #888;
+  margin-top: 2px;
+}
+.bd-chapter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bd-btn {
+  background: #f3f2ec;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 15px;
+  color: #b23b1a;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.bd-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.bd-chapter-list-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: #faf9f6;
+  margin-top: 8px;
+}
+.bd-tech-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  font-size: 13px;
+  color: #888;
+}
+.bd-tech-label {
+  font-weight: 600;
+  color: #222;
+  margin-right: 4px;
+}
+.bd-btn-read {
+  background: #b23b1a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 36px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 16px;
+  box-shadow: 0 2px 8px #0001;
+  transition: background 0.2s;
+}
+.bd-btn-read:hover {
+  background: #a13a18;
+}
+
+/* Badge styles */
+.badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #eee;
+  color: #555;
+  border: 1px solid #e0e0e0;
+}
+.badge-default {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+}
+.badge-secondary {
+  background: #e0e7ef;
+  color: #2563eb;
+  border: none;
+}
+.badge-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: none;
+}
+.badge-premium {
+  background: #fbeee0;
+  color: #b23b1a;
+  border: 1px solid #f3d1b0;
+}
+.badge-outline {
+  background: #fff;
+  color: #b23b1a;
+  border: 1px solid #b23b1a;
+}
+
+@media (max-width: 700px) {
+  .book-detail-modern {
+    padding: 16px 4px 24px 4px;
+  }
+  .bd-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .bd-cover-col {
+    margin-top: 12px;
+    justify-content: flex-start;
+  }
+  .bd-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .bd-tech-grid {
+    grid-template-columns: 1fr;
+  }
+}
